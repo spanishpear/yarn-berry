@@ -144,5 +144,24 @@ describe(`Protocols`, () => {
         },
       ),
     );
+
+    test(
+      `it should properly resolve packages with __archiveUrl parameter`,
+      makeTemporaryEnv(
+        {
+          dependencies: {[`unconventional-tarball`]: `npm:1.0.0::__archiveUrl=https://registry.example.org/unconventional-tarball/tralala/unconventional-tarball-1.0.0.tgz`},
+        },
+        async ({path, run, source}) => {
+          await run(`install`);
+
+          // This test specifically exercises the NpmTarballResolver.resolve() method
+          // by using a descriptor with explicit __archiveUrl parameter
+          await expect(source(`require('unconventional-tarball')`)).resolves.toMatchObject({
+            name: `unconventional-tarball`,
+            version: `1.0.0`,
+          });
+        },
+      ),
+    );
   });
 });
