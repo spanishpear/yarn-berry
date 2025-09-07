@@ -238,5 +238,43 @@ describe(`Protocols`, () => {
         },
       ),
     );
+
+    test(
+      `it should apply patches on packages with unconventional tarball urls (__archiveUrl)`,
+      makeTemporaryEnv(
+        {
+          dependencies: {[`no-deps`]: `1.0.0`},
+        },
+        async ({path, run, source}) => {
+          // Set up a custom registry configuration that would cause __archiveUrl to be added
+          await xfs.writeFilePromise(ppath.join(path, `.yarnrc.yml`), `
+          npmScopes:
+            no-deps:
+              npmRegistryServer: https://custom-registry.example.com
+          `);
+
+          await xfs.writeFilePromise(ppath.join(path, PATCH_NAME), NO_DEPS_PATCH);
+
+          const patchPath = ppath.join(path, PATCH_NAME);
+
+          // Manually create a patch descriptor with __archiveUrl to test the scenario
+          // This simulates what happens when yarn patch-commit creates a patch for a package with __archiveUrl
+          await xfs.writeJsonPromise(ppath.join(path, `package.json`), {
+            dependencies: {
+              [`no-deps`]: `patch:no-deps@npm:1.0.0#${patchPath}::__archiveUrl=https://custom-registry.example.com/no-deps/-/no-deps-1.0.0.tgz`,
+            },
+          });
+
+          // This should work now that NpmTarballResolver can handle descriptors with __archiveUrl
+          await run(`install`);
+
+          await expect(source(`require('no-deps')`)).resolves.toMatchObject({
+            name: `no-deps`,
+            version: `1.0.0`,
+            hello: `world`,
+          });
+        },
+      ),
+    );
   });
 });
